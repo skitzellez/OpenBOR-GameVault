@@ -45,6 +45,72 @@ Here is where we aquiring all joystick events
 and map them to BOR's layout.  Currently support
 up to 4 controllers.
 */
+#ifdef XBOX_UWP
+/*
+ * Copyright (c) 2026 Skitzelles - part of Game Vault, https://github.com/skitzellez/xbox-game-vault
+ * Xbox pads through SDL's game controller API, so the layout never depends on the raw button order.
+ */
+#define XB_PAD_BITS 16
+enum { XB_A, XB_B, XB_X, XB_Y, XB_LB, XB_RB, XB_VIEW, XB_MENU, XB_LS, XB_RS, XB_LT, XB_RT, XB_UP, XB_RIGHT, XB_DOWN, XB_LEFT };
+static SDL_GameController *xb_pad[JOY_LIST_TOTAL];
+static unsigned xb_before[JOY_LIST_TOTAL];
+extern int xbox_launch_changed(void);
+
+static unsigned xbox_pad_read(int i)
+{
+	static const struct { int button, bit; } map[] = {
+		{SDL_CONTROLLER_BUTTON_A, XB_A}, {SDL_CONTROLLER_BUTTON_B, XB_B}, {SDL_CONTROLLER_BUTTON_X, XB_X},
+		{SDL_CONTROLLER_BUTTON_Y, XB_Y}, {SDL_CONTROLLER_BUTTON_LEFTSHOULDER, XB_LB},
+		{SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, XB_RB}, {SDL_CONTROLLER_BUTTON_BACK, XB_VIEW},
+		{SDL_CONTROLLER_BUTTON_START, XB_MENU}, {SDL_CONTROLLER_BUTTON_LEFTSTICK, XB_LS},
+		{SDL_CONTROLLER_BUTTON_RIGHTSTICK, XB_RS}, {SDL_CONTROLLER_BUTTON_DPAD_UP, XB_UP},
+		{SDL_CONTROLLER_BUTTON_DPAD_RIGHT, XB_RIGHT}, {SDL_CONTROLLER_BUTTON_DPAD_DOWN, XB_DOWN},
+		{SDL_CONTROLLER_BUTTON_DPAD_LEFT, XB_LEFT},
+	};
+	unsigned bits = 0;
+	unsigned k;
+	int x, y;
+	SDL_GameController *pad = xb_pad[i];
+	if(!pad) return 0;
+	for(k = 0; k < sizeof(map) / sizeof(map[0]); k++)
+	{
+		if(SDL_GameControllerGetButton(pad, map[k].button)) bits |= 1u << map[k].bit;
+	}
+	if(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16000) bits |= 1u << XB_LT;
+	if(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000) bits |= 1u << XB_RT;
+	x = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
+	y = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTY);
+	if(x < -14000) bits |= 1u << XB_LEFT;
+	if(x >  14000) bits |= 1u << XB_RIGHT;
+	if(y < -14000) bits |= 1u << XB_UP;
+	if(y >  14000) bits |= 1u << XB_DOWN;
+	return bits;
+}
+
+/* Hold View + Menu 2 seconds: back to Game Vault, as in every emulator of the family. Also when another game was
+ * chosen in Game Vault while this app waited in the background (the app cannot restart itself). */
+static void xbox_pad_frame(void)
+{
+	static Uint32 held_since;
+	static Uint32 last_check;
+	const unsigned combo = (1u << XB_VIEW) | (1u << XB_MENU);
+	Uint32 now = SDL_GetTicks();
+	int i, held = 0;
+	for(i = 0; i < JOY_LIST_TOTAL; i++)
+	{
+		if((xb_before[i] & combo) == combo) held = 1;
+	}
+	if(!held) held_since = 0;
+	else if(!held_since) held_since = now;
+	else if(now - held_since >= 2000) borExit(0);
+	if(now - last_check >= 1000)
+	{
+		last_check = now;
+		if(xbox_launch_changed()) borExit(0);
+	}
+}
+#endif
+
 void getPads(Uint8* keystate, Uint8* keystate_def)
 {
 	int i, j, x, axis;
@@ -281,6 +347,10 @@ void getPads(Uint8* keystate, Uint8* keystate_def)
 
 	}
 
+#ifdef XBOX_UWP
+	lastjoy = 0;   /* the raw events number buttons differently: set below */
+	xbox_pad_frame();
+#endif
 	if(joysticks[0].Type != JOY_TYPE_GAMEPARK)
 	{
 		// new PC joystick code - forget about SDL joystick events, just do a state check
@@ -290,6 +360,21 @@ void getPads(Uint8* keystate, Uint8* keystate_def)
 			// reset state
 			joysticks[i].Axes = joysticks[i].Hats = joysticks[i].Buttons = 0;
 			if (joystick[i] == NULL) continue;
+#ifdef XBOX_UWP
+			/* Game Vault: one fixed layout for every Xbox pad; stick and D-pad both move */
+			{
+				unsigned before = xb_before[i];
+				unsigned now = xbox_pad_read(i);
+				for(j = 0; j < XB_PAD_BITS; j++)
+				{
+					if((now & (1u << j)) && !(before & (1u << j))) lastjoy = 1 + i * JOY_MAX_INPUTS + j;
+				}
+				xb_before[i] = now;
+				joysticks[i].Buttons = now;
+				joysticks[i].Data = now;
+				continue;
+			}
+#endif
 
 			// check buttons
 			for(j = 0; j < joysticks[i].NumButtons; j++)
@@ -441,6 +526,12 @@ void open_joystick(int i)
     joysticks[i].NumHats = SDL_JoystickNumHats(joystick[i]);
     joysticks[i].NumAxes = SDL_JoystickNumAxes(joystick[i]);
     joysticks[i].NumButtons = SDL_JoystickNumButtons(joystick[i]);
+#ifdef XBOX_UWP
+    xb_pad[i] = SDL_GameControllerOpen(i);
+    joysticks[i].NumHats = 0;
+    joysticks[i].NumAxes = 0;
+    joysticks[i].NumButtons = XB_PAD_BITS;
+#endif
 
     strcpy(joysticks[i].Name, SDL_JoystickName(i));
 

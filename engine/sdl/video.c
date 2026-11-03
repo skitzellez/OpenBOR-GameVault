@@ -13,7 +13,15 @@
 #else
 
 #include "sdlport.h"
+#ifdef XBOX_UWP
+/* Game Vault: no SDL2_gfx here; the picture is paced by vsync (always on, see SetVideoMode) */
+typedef int FPSmanager;
+#define SDL_initFramerate(m) ((void)(m))
+#define SDL_setFramerate(m, f) ((void)(m), (void)(f))
+#define SDL_framerateDelay(m) ((void)(m))
+#else
 #include "SDL2_framerate.h" // Kratus (01-2023) Added a FPS limit option in the video settings
+#endif
 #include <math.h>
 #include "types.h"
 #include "video.h"
@@ -43,7 +51,12 @@ int brightness = 0;
 void initSDL()
 {
 	SDL_DisplayMode video_info;
+#ifdef XBOX_UWP
+	/* no SDL audio device on the Xbox (it never finishes opening): sound is XAudio2, xbox_audio.c */
+	int init_flags = SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC;
+#else
 	int init_flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC;
+#endif
 
     /*#if EE_CURRENT_PLATFORM == EE_PLATFORM_WINDOWS
        SDL_setenv("SDL_AUDIODRIVER", "directsound", true);
@@ -90,6 +103,13 @@ int SetVideoMode(int w, int h, int bpp, bool gl)
 	static int last_x = SDL_WINDOWPOS_UNDEFINED;
 	static int last_y = SDL_WINDOWPOS_UNDEFINED;
 
+#ifdef XBOX_UWP
+	/* Game Vault: an Xbox app is always the whole screen; a "window" of 320x240 only breaks the scale */
+	savedata.fullscreen = 1;
+	w = nativeWidth;
+	h = nativeHeight;
+	flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+#endif
 	if(gl) flags |= SDL_WINDOW_OPENGL;
 	if(savedata.fullscreen) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 
@@ -144,7 +164,11 @@ int SetVideoMode(int w, int h, int bpp, bool gl)
 
 	if(!gl)
 	{
+		#ifdef XBOX_UWP
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+#else
 		renderer = SDL_CreateRenderer(window, -1, savedata.vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
+#endif
 		if(!renderer)
 		{
 			printf("Error: failed to create renderer: %s\n", SDL_GetError());
@@ -196,6 +220,17 @@ int video_set_mode(s_videomodes videomodes)
 	SDL_ShowCursor(SDL_DISABLE);
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	video_stretch(savedata.stretch);
+#ifdef XBOX_UWP
+	{
+		extern void xbox_log(const char *fmt, ...);
+		SDL_RendererInfo ri;
+		int ww = 0, wh = 0, ow = 0, oh = 0;
+		SDL_GetWindowSize(window, &ww, &wh);
+		SDL_GetRendererOutputSize(renderer, &ow, &oh);
+		SDL_GetRendererInfo(renderer, &ri);
+		xbox_log("video: mode %dx%d x%g native %dx%d window %dx%d output %dx%d renderer %s stretch %d fps %d", videomodes.hRes, videomodes.vRes, (double)videomodes.hScale, nativeWidth, nativeHeight, ww, wh, ow, oh, ri.name, savedata.stretch, savedata.fpslimit);
+	}
+#endif
 
 	return 1;
 }

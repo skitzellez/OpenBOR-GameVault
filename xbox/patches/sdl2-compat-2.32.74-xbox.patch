@@ -1,0 +1,32 @@
+diff --git a/src/dynapi/SDL_dynapi.c b/src/dynapi/SDL_dynapi.c
+index eb187fd..cd606a2 100644
+--- a/src/dynapi/SDL_dynapi.c
++++ b/src/dynapi/SDL_dynapi.c
+@@ -418,7 +418,10 @@ static void dynapi_warn(const char *msg)
+ {
+     const char *caption = "SDL Dynamic API Failure!";
+ /* SDL_ShowSimpleMessageBox() is a too heavy for here. */
+-#if (defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_CYGWIN)) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++#ifdef XBOX_UWP /* Game Vault: no USER32 in an Xbox app */
++    OutputDebugStringA(msg);
++    (void)caption;
++#elif (defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_CYGWIN)) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+     MessageBoxA(NULL, msg, caption, MB_OK | MB_ICONERROR);
+ #else
+     fprintf(stderr, "\n\n%s\n%s\n\n", caption, msg);
+diff --git a/src/sdl2_compat.c b/src/sdl2_compat.c
+index b185240..9c4c880 100644
+--- a/src/sdl2_compat.c
++++ b/src/sdl2_compat.c
+@@ -1178,7 +1178,11 @@ void *_intel_fast_memset(void *dst, int c, size_t len)
+ #if defined(_WIN32)
+ static void error_dialog(const char *errorMsg)
+ {
++#ifdef XBOX_UWP /* Game Vault: no USER32 in an Xbox app */
++    OutputDebugStringA(errorMsg);
++#else
+     MessageBoxA(NULL, errorMsg, "Error", MB_OK | MB_SETFOREGROUND | MB_ICONSTOP);
++#endif
+ }
+ #elif defined(__APPLE__)
+ extern void error_dialog(const char *errorMsg);

@@ -55,6 +55,9 @@ char* AndroidRoot(char *relPath)
 
 void borExit(int reset)
 {
+#ifdef XBOX_UWP
+	SDL_OpenURL("gamevault:?from=openbor");   /* Xbox: closing goes back to Game Vault */
+#endif
 #ifdef GP2X
 	gp2x_end();
 	chdir("/usr/gp2x");
@@ -67,7 +70,11 @@ void borExit(int reset)
     exit(reset);
 }
 
+#ifdef XBOX_UWP
+int openbor_main(int argc, char *argv[])   /* started by WinMain in xbox_main.c, through SDL_RunApp */
+#else
 int main(int argc, char *argv[])
+#endif
 {
 #ifndef SKIP_CODE
 	char pakname[MAX_FILENAME_LEN] = {""};
@@ -130,6 +137,21 @@ int main(int argc, char *argv[])
     }
 	dirExists(rootDir, 1);
     chdir(rootDir);
+#endif
+
+#ifdef XBOX_UWP
+	/* Game Vault (Xbox): everything in the Game Vault family's shared folder (engine/sdl/xbox_main.c) -
+	 * the app's own install folder is read-only, and saves stay when the app is reinstalled */
+	{
+		extern char xbox_openbor_home[];
+		char xboxRoot[MAX_BUFFER_LEN];
+		snprintf(xboxRoot, sizeof(xboxRoot), "%s\\", xbox_openbor_home);
+		snprintf(paksDir, sizeof(paksDir), "%s\\Paks", xbox_openbor_home);
+		snprintf(savesDir, sizeof(savesDir), "%s\\Saves", xbox_openbor_home);
+		snprintf(screenShotsDir, sizeof(screenShotsDir), "%s\\ScreenShots", xbox_openbor_home);
+		dirExists(xboxRoot, 1);
+		{ extern const char *xbox_log_dir(void); chdir(xbox_log_dir()); }   /* "Logs" in LocalState: Device Portal can read it */
+	}
 #endif
 
 	dirExists(paksDir, 1);

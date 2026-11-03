@@ -198,11 +198,15 @@ u64 getSystemRam(int byte_size)
 u64 getUsedRam(int byte_size)
 {
 #ifdef WIN
+#ifdef XBOX_UWP /* Game Vault: K32GetProcessMemoryInfo cannot be imported in an Xbox app; only a log figure */
+    return 0;
+#else
     PROCESS_MEMORY_COUNTERS pmc;
     memset(&pmc, 0, sizeof(PROCESS_MEMORY_COUNTERS));
     pmc.cb = sizeof(pmc);
     GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&pmc, pmc.cb);
     return pmc.WorkingSetSize / byte_size;
+#endif
 #elif DARWIN
     struct task_basic_info  info;
     kern_return_t           rval = 0;

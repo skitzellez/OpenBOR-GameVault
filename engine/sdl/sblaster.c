@@ -6,6 +6,8 @@
  * Copyright (c)  OpenBOR Team
  */
 
+#ifndef XBOX_UWP /* Xbox: engine/sdl/xbox_audio.c */
+
 // A soundblaster interface. No bugs?
 
 #include "sblaster.h"
@@ -81,3 +83,5 @@ void SB_updatevolume(int volume)
 		voicevol = lastvol;
 #endif
 }
+
+#endif /* XBOX_UWP */

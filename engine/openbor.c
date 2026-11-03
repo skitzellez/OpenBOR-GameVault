@@ -2592,6 +2592,25 @@ void clearbuttons(int player)
             //savedata.keys[3][SDID_ESC]       = CONTROL_DEFAULT4_ESC;
         #endif
     }
+#ifdef XBOX_UWP
+    /* Game Vault: every player's pad, the usual beat 'em up layout (bits: xbox_pad_read in sdl/control.c) */
+    {
+#define XB_KEY(bit) (JOY_LIST_FIRST + 1 + player * JOY_MAX_INPUTS + (bit))
+        savedata.keys[player][SDID_MOVEUP]    = XB_KEY(12);
+        savedata.keys[player][SDID_MOVERIGHT] = XB_KEY(13);
+        savedata.keys[player][SDID_MOVEDOWN]  = XB_KEY(14);
+        savedata.keys[player][SDID_MOVELEFT]  = XB_KEY(15);
+        savedata.keys[player][SDID_ATTACK]    = XB_KEY(2);    /* X */
+        savedata.keys[player][SDID_ATTACK2]   = XB_KEY(3);    /* Y */
+        savedata.keys[player][SDID_ATTACK3]   = XB_KEY(4);    /* LB */
+        savedata.keys[player][SDID_ATTACK4]   = XB_KEY(5);    /* RB */
+        savedata.keys[player][SDID_JUMP]      = XB_KEY(0);    /* A */
+        savedata.keys[player][SDID_SPECIAL]   = XB_KEY(1);    /* B */
+        savedata.keys[player][SDID_START]     = XB_KEY(7);    /* Menu */
+        savedata.keys[player][SDID_SCREENSHOT] = 0;
+#undef XB_KEY
+    }
+#endif
 }
 
 void clearsettings()
